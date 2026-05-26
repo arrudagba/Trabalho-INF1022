@@ -1,7 +1,7 @@
 # Trabalho Final INF1022 2026.1 — Analisador Sintático ObsAct
 
 **Disciplina:** INF1022 — Analisadores Léxicos e Sintáticos 
-**Professores:** Luís e Edward Hermann  
+**Professores:** Luís Henrique e Edward Hermann  
 **Turma:** 3WB
 
 | Aluno | Matrícula |
