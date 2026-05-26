@@ -1,3 +1,5 @@
+import ast
+
 import ply.lex as lex
 
 reserved = {
@@ -14,6 +16,10 @@ reserved = {
     'desligar': 'DESLIGAR',
     'True': 'TRUE',
     'False': 'FALSE',
+    'TRUE': 'TRUE',
+    'FALSE': 'FALSE',
+    'true': 'TRUE',
+    'false': 'FALSE',
 }
 
 tokens = [
@@ -21,7 +27,7 @@ tokens = [
     'COLON', 'COMMA', 'DOT', 'ASSIGN',
     'LBRACE', 'RBRACE', 'LPAREN', 'RPAREN',
     'AND', 'OPLOGIC',
-] + list(reserved.values())
+] + sorted(set(reserved.values()))
 
 t_COLON   = r':'
 t_COMMA   = r','
@@ -43,8 +49,8 @@ def t_NUMBER(t):
     return t
 
 def t_STRING(t):
-    r'"[^"]*"'
-    t.value = t.value[1:-1]
+    r'"([^"\\]|\\.)*"'
+    t.value = ast.literal_eval(t.value)
     return t
 
 def t_IDENT(t):
@@ -52,10 +58,19 @@ def t_IDENT(t):
     t.type = reserved.get(t.value, 'IDENT')
     return t
 
-t_ignore = ' \t\r\n'
+t_ignore = ' \t\r\ufeff'
+
+def t_newline(t):
+    r'\n+'
+    t.lexer.lineno += len(t.value)
 
 def t_error(t):
-    print(f"ERRO LEXICO: caractere inesperado {t.value[0]!r} linha {t.lineno}")
+    message = f"ERRO LEXICO: caractere inesperado {t.value[0]!r} linha {t.lineno}"
+    print(message)
+    if not hasattr(t.lexer, 'errors'):
+        t.lexer.errors = []
+    t.lexer.errors.append(message)
     t.lexer.skip(1)
 
 lexer = lex.lex()
+lexer.errors = []

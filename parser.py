@@ -16,12 +16,17 @@ def p_devices_one(p):
     p[0] = [p[1]]
 
 def p_device_simple(p):
-    'device : DISPOSITIVO COLON LBRACE IDENT RBRACE'
-    p[0] = ('device', p[4], None)
+    'device : DISPOSITIVO device_open IDENT RBRACE'
+    p[0] = ('device', p[3], None)
 
 def p_device_obs(p):
-    'device : DISPOSITIVO COLON LBRACE IDENT COMMA IDENT RBRACE'
-    p[0] = ('device', p[4], p[6])
+    'device : DISPOSITIVO device_open IDENT COMMA IDENT RBRACE'
+    p[0] = ('device', p[3], p[5])
+
+def p_device_open(p):
+    '''device_open : COLON LBRACE
+                   | LBRACE'''
+    p[0] = None
 
 def p_cmds_list(p):
     'cmds : cmd DOT cmds'
@@ -29,6 +34,14 @@ def p_cmds_list(p):
 
 def p_cmds_one(p):
     'cmds : cmd DOT'
+    p[0] = [p[1]]
+
+def p_cmds_list_without_dot(p):
+    'cmds : cmd cmds'
+    p[0] = [p[1]] + p[2]
+
+def p_cmds_one_without_dot(p):
+    'cmds : cmd'
     p[0] = [p[1]]
 
 def p_cmd(p):
@@ -74,21 +87,31 @@ def p_act_action(p):
            | DESLIGAR IDENT'''
     p[0] = ('action', p[1], p[2])
 
-def p_act_alert_msg(p):
-    'act : ENVIAR ALERTA LPAREN STRING RPAREN IDENT'
-    p[0] = ('alert', p[4], None, [p[6]])
+def p_act_alert_direct(p):
+    'act : ENVIAR ALERTA alert_args IDENT'
+    msg, var = p[3]
+    p[0] = ('alert', msg, var, [p[4]])
 
-def p_act_alert_var(p):
-    'act : ENVIAR ALERTA LPAREN STRING COMMA IDENT RPAREN IDENT'
-    p[0] = ('alert', p[4], p[6], [p[8]])
+def p_act_alert_broadcast(p):
+    'act : ENVIAR ALERTA alert_args PARA TODOS COLON namelist'
+    msg, var = p[3]
+    p[0] = ('alert', msg, var, p[7])
 
-def p_act_broadcast_msg(p):
-    'act : ENVIAR ALERTA LPAREN STRING RPAREN PARA TODOS COLON namelist'
-    p[0] = ('alert', p[4], None, p[9])
+def p_alert_args_msg(p):
+    '''alert_args : LPAREN STRING RPAREN
+                  | STRING'''
+    if len(p) == 4:
+        p[0] = (p[2], None)
+    else:
+        p[0] = (p[1], None)
 
-def p_act_broadcast_var(p):
-    'act : ENVIAR ALERTA LPAREN STRING COMMA IDENT RPAREN PARA TODOS COLON namelist'
-    p[0] = ('alert', p[4], p[6], p[11])
+def p_alert_args_var(p):
+    '''alert_args : LPAREN STRING COMMA IDENT RPAREN
+                  | STRING COMMA IDENT'''
+    if len(p) == 6:
+        p[0] = (p[2], p[4])
+    else:
+        p[0] = (p[1], p[3])
 
 def p_namelist_one(p):
     'namelist : IDENT'

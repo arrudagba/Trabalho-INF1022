@@ -1,7 +1,7 @@
-# Trabalho Final INF1022 2025.1 — Analisador Sintático ObsAct
+# Trabalho Final INF1022 2026.1 — Analisador Sintático ObsAct
 
-**Disciplina:** INF1022 — Compiladores  
-**Professores:** Vitor Pinheiro e Edward Hermann  
+**Disciplina:** INF1022 — Analisadores Léxicos e Sintáticos 
+**Professores:** Luís e Edward Hermann  
 **Turma:** 3WB
 
 | Aluno | Matrícula |
@@ -32,6 +32,10 @@ Foram implementadas as seguintes funcionalidades:
 - **Broadcast com variável**: `enviar alerta ("msg", observation) para todos: dev1, dev2, ...`
 - Geração das 4 funções de runtime no código Python de saída (`ligar`, `desligar`, `alerta` com e sem variável)
 - Inicialização automática de toda `observation` para zero (conforme Suposições do enunciado)
+- Validação semântica de dispositivos e observações declarados antes do uso
+- Validação de formato: `namedevice` apenas com letras e `observation` com letras/números iniciando por letra
+- Suporte a booleanos `True`/`False`, `TRUE`/`FALSE` e `true`/`false`
+- Geração de nomes Python seguros para observações que colidam com palavras reservadas da linguagem alvo
 
 ---
 
@@ -49,11 +53,13 @@ A concatenação `msg + " " + str(observation)` na função `alerta` segue a esp
 
 ---
 
-## O que não funciona / limitações
+As validações semânticas foram separadas da análise sintática em `semantic.py`. Assim, o lexer continua usando `IDENT` para nomes em geral, enquanto a etapa semântica verifica o papel de cada identificador no contexto correto:
 
-- **Validação semântica**: o analisador não verifica se um `namedevice` foi declarado antes de ser usado em um comando, nem se uma `observation` existe no dispositivo referenciado. Erros desse tipo só aparecem em tempo de execução do Python gerado.
-- **Distinção léxica `namedevice` vs `observation`**: o enunciado define que `namedevice` contém apenas letras enquanto `observation` pode conter letras e números (começando por letra). Ambos caem no mesmo token `IDENT` no lexer — distingui-los exigiria contexto semântico, não léxico. A gramática posicional já garante o uso correto em cada regra.
-- Comandos ACT "soltos" (sem `se`) apenas na forma `ligar` e `desligar` foram implementados. Um `enviar alerta` sem condição precedente é suportado (é um CMD válido via regra `cmd -> act`).
+- `namedevice` deve conter somente letras.
+- `observation` deve conter letras e números, começando por letra.
+- Todo dispositivo usado por `ligar`, `desligar` ou `enviar alerta` precisa ter sido declarado.
+- Toda observação usada em `set`, condições ou alerta com variável precisa ter sido declarada em algum dispositivo.
+- Dispositivos duplicados são rejeitados.
 
 ---
 
@@ -70,6 +76,8 @@ A concatenação `msg + " " + str(observation)` na função `alerta` segue a esp
 | `exemplo5.obsact` | Alerta simples sem variável |
 
 Saídas geradas (arquivos `.py`) estão na mesma pasta `testes/`.
+
+Além dos exemplos positivos, foram verificados casos de erro semântico: uso de dispositivo não declarado, uso de observação não declarada, `namedevice` com número, arquivos UTF-8 com BOM e observação com nome que seria palavra reservada em Python.
 
 ---
 
@@ -109,11 +117,16 @@ programa  ->  devices cmds
 devices   ->  device devices
            |  device
 
-device    ->  dispositivo : { IDENT }
-           |  dispositivo : { IDENT , IDENT }
+device    ->  dispositivo device_open IDENT }
+           |  dispositivo device_open IDENT , IDENT }
+
+device_open -> : {
+            |  {
 
 cmds      ->  cmd . cmds
            |  cmd .
+           |  cmd cmds
+           |  cmd
 
 cmd       ->  attrib
            |  obsact
@@ -122,8 +135,8 @@ cmd       ->  attrib
 attrib    ->  set IDENT = var
 
 var       ->  NUMBER
-           |  True
-           |  False
+           |  TRUE
+           |  FALSE
 
 obsact    ->  se obs entao act
            |  se obs entao act senao act
@@ -135,10 +148,13 @@ oplogic   ->  >  |  <  |  >=  |  <=  |  ==  |  !=
 
 act       ->  ligar IDENT
            |  desligar IDENT
-           |  enviar alerta ( STRING ) IDENT
-           |  enviar alerta ( STRING , IDENT ) IDENT
-           |  enviar alerta ( STRING ) para todos : namelist
-           |  enviar alerta ( STRING , IDENT ) para todos : namelist
+           |  enviar alerta alert_args IDENT
+           |  enviar alerta alert_args para todos : namelist
+
+alert_args -> ( STRING )
+           |  ( STRING , IDENT )
+           |  STRING
+           |  STRING , IDENT
 
 namelist  ->  IDENT
            |  IDENT , namelist
@@ -148,12 +164,15 @@ namelist  ->  IDENT
 
 | Ponto | Alteração |
 |---|---|
-| `VAR -> num \| bool` | Fatorado como alternativas explícitas (`NUMBER`, `True`, `False`); o enunciado escrevia `num bool` mas a intenção é `num` **ou** `bool` |
+| `VAR -> num \| bool` | Fatorado como alternativas explícitas (`NUMBER`, `TRUE`, `FALSE`); o lexer aceita também `True`/`False` e `true`/`false` |
 | `DEVICES -> DEVICE DEVICES \| DEVICES` | Recursão à esquerda solta no enunciado simplificada para `device devices \| device` (necessário para LALR(1)) |
 | `ACT` broadcast | Adicionado nas duas formas: com e sem variável, conforme seção 1.1 do enunciado |
 | `&&` em `obs` | Associativo à direita via recursão: `IDENT oplogic var && obs` |
-| `cmd -> act` | Adicionado para permitir ações sem condição (`ligar`/`desligar` diretamente) |
-| Terminal `.` | Finaliza `cmd` dentro de `cmds`; `ATTRIB` e `OBSACT` e `ACT` todos terminam com `.` |
+| `cmd -> act` | Adicionado para permitir ações sem condição (`ligar`, `desligar` e `enviar alerta` diretamente) |
+| Terminal `.` | O ponto continua aceito como finalizador de comando, mas também foi permitido omiti-lo para cobrir exemplos do enunciado que aparecem sem o ponto final |
+| `device_open` | Permite `dispositivo: { ... }` e `dispositivo { ... }`, cobrindo a forma principal da gramática e variações dos exemplos |
+| `alert_args` | Fatora as formas de alerta e aceita mensagem com ou sem parênteses, pois os exemplos do PDF alternam entre as duas formas |
+| Validação semântica | Implementada fora da gramática em `semantic.py`: declarações, duplicidade, formato de nomes e existência de dispositivos/observações |
 
 ---
 
@@ -164,6 +183,7 @@ Trabalho 2026.1/
 ├── obsact.py       # driver principal (lê .obsact, escreve .py)
 ├── lexer.py        # analisador léxico (PLY lex)
 ├── parser.py       # analisador sintático LALR(1) + construção de AST (PLY yacc)
+├── semantic.py     # validação semântica e tabela de símbolos
 ├── codegen.py      # gerador de código Python a partir da AST
 ├── README.md       # este relatório
 └── testes/
