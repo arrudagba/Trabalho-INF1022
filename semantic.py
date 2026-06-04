@@ -3,7 +3,9 @@ import re
 
 DEVICE_RE = re.compile(r'^[A-Za-z]+$')
 OBSERVATION_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_]*$')
-RUNTIME_NAMES = {'ligar', 'desligar', 'desligar', 'verificar', 'alerta', 'main'}
+MAX_DEVICE_NAME_LEN = 100
+MAX_MSG_LEN = 100
+RUNTIME_NAMES = {'ligar', 'desligar', 'verificar', 'alerta', 'main'}
 
 
 class SemanticError(Exception):
@@ -22,8 +24,9 @@ def validate(ast):
     observations = {}
 
     for _, name, observation in devices:
-        if not _valid_device_name(name):
-            errors.append(f"namedevice '{name}' invalido; use somente letras")
+        device_errors = _device_name_errors(name, 'declaracao')
+        if device_errors:
+            errors.extend(device_errors)
         elif name in device_names:
             errors.append(f"dispositivo '{name}' declarado mais de uma vez")
         else:
@@ -58,10 +61,14 @@ def _validate_cmd(cmd, devices, observations, errors):
     if tag == 'attrib':
         _, obs_name, value = cmd
         if isinstance(value, tuple) and value[0] == 'actexecute':
-            # result of verificar/ligar/desligar stored in a local var — no obs declaration needed
+            # Results from actions may introduce local observation-like variables.
+            if not _valid_observation_name(obs_name):
+                errors.append(
+                    f"observation '{obs_name}' invalida em atribuicao; use letras e numeros, comecando por letra"
+                )
             _validate_actexecute(value, devices, 'atribuicao', errors)
-            # register as a local so downstream uses in conditions work
-            observations.setdefault(obs_name, [])
+            if _valid_observation_name(obs_name):
+                observations.setdefault(obs_name, [])
         else:
             _require_observation(obs_name, observations, 'atribuicao', errors)
         return
@@ -70,6 +77,10 @@ def _validate_cmd(cmd, devices, observations, errors):
         _, dev_name, obs_name, _value = cmd
         _require_device(dev_name, devices, 'atribuicao', errors)
         _require_observation(obs_name, observations, 'atribuicao', errors)
+        if dev_name in devices and obs_name in observations and devices[dev_name] != obs_name:
+            errors.append(
+                f"observation '{obs_name}' nao pertence ao dispositivo '{dev_name}'"
+            )
         return
 
     if tag == 'if':
@@ -89,13 +100,11 @@ def _validate_cmd(cmd, devices, observations, errors):
 
     if tag == 'alert':
         _, msg, obs_var, target_devices = cmd
-        if len(msg) > 100:
-            errors.append(f"msg excede 100 caracteres: {msg[:30]!r}...")
+        if len(msg) > MAX_MSG_LEN:
+            errors.append(f"msg excede {MAX_MSG_LEN} caracteres: {msg[:30]!r}...")
         if obs_var is not None:
             _require_observation(obs_var, observations, 'alerta', errors)
         for d in target_devices:
-            if len(d) > 100:
-                errors.append(f"namedevice '{d[:30]}...' excede 100 caracteres")
             _require_device(d, devices, 'alerta', errors)
         return
 
@@ -114,8 +123,9 @@ def _validate_actexecute(node, devices, context, errors):
 
 
 def _require_device(name, devices, context, errors):
-    if not _valid_device_name(name):
-        errors.append(f"namedevice '{name}' invalido em {context}; use somente letras")
+    device_errors = _device_name_errors(name, context)
+    if device_errors:
+        errors.extend(device_errors)
         return
     if name not in devices:
         errors.append(f"dispositivo '{name}' usado em {context} nao foi declarado")
@@ -135,6 +145,17 @@ def _require_observation(name, observations, context, errors):
 
 def _valid_device_name(name):
     return DEVICE_RE.fullmatch(name) is not None
+
+
+def _device_name_errors(name, context):
+    errors = []
+    if len(name) > MAX_DEVICE_NAME_LEN:
+        errors.append(
+            f"namedevice '{name[:30]}...' excede {MAX_DEVICE_NAME_LEN} caracteres em {context}"
+        )
+    if not _valid_device_name(name):
+        errors.append(f"namedevice '{name}' invalido em {context}; use somente letras")
+    return errors
 
 
 def _valid_observation_name(name):

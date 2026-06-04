@@ -21,7 +21,7 @@ Funcionalidades implementadas:
 - Atribuição via `set observation = VAR` (inteiros e booleanos `True`/`False`/`true`/`false`/`TRUE`/`FALSE`)
 - Atribuição via `set observation = ACTEXECUTE` — captura retorno de `verificar`, `ligar` ou `desligar`
 - Atribuição em bloco: `set {namedevice, observation} = VAR`
-- Ação `verificar(namedevice)` — nova ação que retorna 1 (ligado) ou 0 (desligado)
+- Ação `verificar(namedevice)` — retorna 1 (ligado) ou 0 (desligado) de acordo com o estado registrado do dispositivo
 - Ações `ligar` (retorna 1) e `desligar` (retorna 0)
 - Condicional `se OBS entao CMDS` com corpo **multi-comando** e **ifs aninhados**
 - Condicional `se OBS entao CMDS senao CMDS`
@@ -33,7 +33,7 @@ Funcionalidades implementadas:
 - **Broadcast**: `enviar alerta ("msg") para todos: dev1, dev2, ...`
 - Geração das 5 funções de runtime no Python gerado: `ligar`, `desligar`, `verificar`, `alerta` (com e sem variável)
 - Inicialização automática de toda `observation` para zero (conforme Suposições do enunciado)
-- Validação semântica separada em `semantic.py`: dispositivos e observações declarados, nomes válidos, duplicatas
+- Validação semântica separada em `semantic.py`: dispositivos e observações declarados, nomes válidos, duplicatas, limite de 100 caracteres para `namedevice`/`msg` e associação em `set {namedevice, observation}`
 
 ---
 
@@ -55,9 +55,7 @@ A função `alerta` concatena `msg + " " + str(observation)` conforme especifica
 
 ## O que não funciona / limitações
 
-- **`verificar` é placeholder**: retorna sempre 0 (desligado). Implementação real exigiria rastrear estado de cada dispositivo em tempo de execução, o que vai além do escopo do transpilador.
-- **Variáveis locais de `actexecute`**: `set x = verificar(dev)` cria uma variável local `x` não vinculada a nenhum dispositivo declarado. A validação semântica aceita esse padrão e registra a variável automaticamente para uso posterior em condições.
-- Validação não distingue se uma `observation` está associada ao dispositivo correto — só verifica se foi declarada em algum dispositivo.
+Não há limitações conhecidas dentro do escopo do enunciado. `set x = verificar(dev)` é aceito para cobrir os exemplos do enunciado: a variável `x` é registrada como variável local e pode ser usada em condições posteriores.
 
 ---
 
@@ -176,7 +174,7 @@ namelist     ->  IDENT | IDENT , namelist
 | `device_open` | Aceita `dispositivo: { }` e `dispositivo { }` |
 | Identifiers com `_` | Lexer e validação semântica aceitam `_` em observation names para cobrir variáveis como `estado_ventilador` dos exemplos |
 | Validação semântica | Em `semantic.py`: verifica declarações, duplicatas, formatos de nomes |
-| 5 funções de runtime | `ligar` retorna 1, `desligar` retorna 0, `verificar` adicionada (retorna 0 como placeholder) |
+| 5 funções de runtime | `ligar` retorna 1 e marca o dispositivo como ligado; `desligar` retorna 0 e marca como desligado; `verificar` consulta esse estado |
 
 ---
 

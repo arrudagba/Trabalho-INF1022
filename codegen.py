@@ -1,15 +1,26 @@
-RUNTIME = '''def ligar(namedevice):
+RUNTIME = '''_device_states = {}
+
+def inicializar_dispositivos(*namedevices):
+    for namedevice in namedevices:
+        _device_states.setdefault(namedevice, 0)
+
+def ligar(namedevice):
+    _device_states[namedevice] = 1
     print(namedevice + " ligado!")
     return 1
 
 def desligar(namedevice):
+    _device_states[namedevice] = 0
     print(namedevice + " desligado!")
     return 0
 
 def verificar(namedevice):
-    # placeholder: real implementation depends on device state tracking
-    print(namedevice + " esta desligado.")
-    return 0
+    estado = _device_states.get(namedevice, 0)
+    if estado == 1:
+        print(namedevice + " esta ligado.")
+    else:
+        print(namedevice + " esta desligado.")
+    return estado
 
 def alerta(namedevice, msg, var=None):
     print(namedevice + " recebeu o alerta:")
@@ -117,6 +128,14 @@ def generate(ast, symbols=None):
     out = RUNTIME + '\ndef main():\n'
 
     body = ''
+    device_names = []
+    for _, name, _obs in devices:
+        if name not in device_names:
+            device_names.append(name)
+    if device_names:
+        args = ', '.join(repr(name) for name in device_names)
+        body += f"    inicializar_dispositivos({args})\n"
+
     for obs in symbols.get('observations', []):
         py_name = symbols['py_names'].get(obs, obs)
         body += f"    {py_name} = 0\n"
