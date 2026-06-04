@@ -14,6 +14,7 @@ reserved = {
     'todos': 'TODOS',
     'ligar': 'LIGAR',
     'desligar': 'DESLIGAR',
+    'verificar': 'VERIFICAR',
     'True': 'TRUE',
     'False': 'FALSE',
     'TRUE': 'TRUE',
@@ -54,7 +55,7 @@ def t_STRING(t):
     return t
 
 def t_IDENT(t):
-    r'[A-Za-z][A-Za-z0-9]*'
+    r'[A-Za-z][A-Za-z0-9_]*'
     t.type = reserved.get(t.value, 'IDENT')
     return t
 
