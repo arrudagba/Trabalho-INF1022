@@ -61,6 +61,10 @@ def p_full_cmd_simple(p):
     'full_cmd : simple_cmd DOT'
     p[0] = p[1]
 
+def p_full_cmd_simple_without_dot(p):
+    'full_cmd : simple_cmd'
+    p[0] = p[1]
+
 def p_simple_cmd(p):
     '''simple_cmd : attrib
                   | act'''
