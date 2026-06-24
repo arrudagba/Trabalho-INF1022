@@ -1,0 +1,7 @@
+dispositivo: {Monitor}
+dispositivo: {lampada, movimento}
+dispositivo: {higrometro, umidade}
+set umidade = 50.
+set movimento = True.
+se umidade < 40 entao enviar alerta "Ar seco" Monitor.
+se movimento == True entao ligar lampada.

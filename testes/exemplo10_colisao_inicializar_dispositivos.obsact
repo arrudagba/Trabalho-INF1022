@@ -1,0 +1,3 @@
+dispositivo: {Sensor, inicializar_dispositivos}
+set inicializar_dispositivos = 1.
+enviar alerta ("Valor", inicializar_dispositivos) Sensor.

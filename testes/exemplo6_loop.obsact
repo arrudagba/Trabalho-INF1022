@@ -1,0 +1,7 @@
+dispositivo: {lampada, estado}
+set estado = 0.
+enquanto estado == 0 faca {
+    ligar lampada.
+    set estado = verificar(lampada).
+}
+enviar alerta ("Loop terminou", estado) lampada.
