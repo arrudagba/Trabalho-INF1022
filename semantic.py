@@ -94,12 +94,22 @@ def _validate_cmd(cmd, devices, observations, errors):
                 _validate_cmd(c, devices, observations, errors)
         return
 
+    if tag == 'while':
+        _, conds, body_cmds = cmd
+        for cond in conds:
+            _validate_cond(cond, devices, observations, errors)
+        for c in body_cmds:
+            _validate_cmd(c, devices, observations, errors)
+        return
+
     if tag == 'actexecute':
         _validate_actexecute(cmd, devices, 'acao', errors)
         return
 
     if tag == 'alert':
         _, msg, obs_var, target_devices = cmd
+        if not msg.strip():
+            errors.append("msg nao pode ser vazia")
         if len(msg) > MAX_MSG_LEN:
             errors.append(f"msg excede {MAX_MSG_LEN} caracteres: {msg[:30]!r}...")
         if obs_var is not None:

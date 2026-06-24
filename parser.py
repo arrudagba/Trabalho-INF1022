@@ -7,6 +7,7 @@ from lexer import tokens
 # ('attrib', obs_name, value)         -- value: ('num',n)|('bool',b)|('actexecute',act,dev)
 # ('attrib_device', dev, obs, value)  -- set {dev, obs} = val
 # ('if', cond_list, then_cmds, else_cmds|None)
+# ('while', cond_list, body_cmds)
 # ('actexecute', 'ligar'|'desligar'|'verificar', device)
 # ('alert', msg, obs|None, devices_list)
 # cond item: ('cond', lhs, op, rhs)
@@ -55,6 +56,14 @@ def p_full_cmd_obsact_dot(p):
 
 def p_full_cmd_obsact(p):
     'full_cmd : obsact'
+    p[0] = p[1]
+
+def p_full_cmd_loop_dot(p):
+    'full_cmd : loop DOT'
+    p[0] = p[1]
+
+def p_full_cmd_loop(p):
+    'full_cmd : loop'
     p[0] = p[1]
 
 def p_full_cmd_simple(p):
@@ -114,6 +123,10 @@ def p_obsact_ifelse(p):
     'obsact : SE obs ENTAO if_cmds SENAO if_cmds'
     p[0] = ('if', p[2], p[4], p[6])
 
+def p_loop(p):
+    'loop : ENQUANTO obs FACA LBRACE block_cmds RBRACE'
+    p[0] = ('while', p[2], p[5])
+
 # if_cmds: one or more cmds inside an if body.
 # Each simple_cmd may or may not have a trailing dot (to handle both single-line
 # and multi-line bodies). PLY resolves shift/reduce by preferring shift (greedy).
@@ -145,6 +158,40 @@ def p_if_cmds_obsact_more(p):
 def p_if_cmds_obsact(p):
     'if_cmds : obsact'
     p[0] = [p[1]]
+
+# block_cmds is used by explicit braced blocks, currently loops.
+
+def p_block_cmds_more(p):
+    'block_cmds : block_cmd block_cmds'
+    p[0] = [p[1]] + p[2]
+
+def p_block_cmds_one(p):
+    'block_cmds : block_cmd'
+    p[0] = [p[1]]
+
+def p_block_cmd_simple_dot(p):
+    'block_cmd : simple_cmd DOT'
+    p[0] = p[1]
+
+def p_block_cmd_simple(p):
+    'block_cmd : simple_cmd'
+    p[0] = p[1]
+
+def p_block_cmd_obsact_dot(p):
+    'block_cmd : obsact DOT'
+    p[0] = p[1]
+
+def p_block_cmd_obsact(p):
+    'block_cmd : obsact'
+    p[0] = p[1]
+
+def p_block_cmd_loop_dot(p):
+    'block_cmd : loop DOT'
+    p[0] = p[1]
+
+def p_block_cmd_loop(p):
+    'block_cmd : loop'
+    p[0] = p[1]
 
 # ── obs (conditions) ──────────────────────────────────────────────────────────
 

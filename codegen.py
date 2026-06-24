@@ -104,6 +104,13 @@ def gen_cmd(cmd, indent, symbols):
                 out += gen_cmd(c, indent + 1, symbols)
         return out
 
+    if tag == 'while':
+        _, conds, body_cmds = cmd
+        out = f"{pad}while {gen_obs(conds, symbols)}:\n"
+        for c in body_cmds:
+            out += gen_cmd(c, indent + 1, symbols)
+        return out
+
     if tag == 'actexecute':
         return gen_actexecute_stmt(cmd, indent, symbols)
 

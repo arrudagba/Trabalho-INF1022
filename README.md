@@ -25,6 +25,7 @@ Funcionalidades implementadas:
 - Ações `ligar` (retorna 1) e `desligar` (retorna 0)
 - Condicional `se OBS entao CMDS` com corpo **multi-comando** e **ifs aninhados**
 - Condicional `se OBS entao CMDS senao CMDS`
+- Laço `enquanto OBS faca { CMDS }` como funcionalidade adicional
 - Condição com `verificar(dev)`: `se verificar(umidificador) == 0 entao ...`
 - Condições compostas com `&&`
 - Operadores lógicos: `>`, `<`, `>=`, `<=`, `==`, `!=`
@@ -33,13 +34,13 @@ Funcionalidades implementadas:
 - **Broadcast**: `enviar alerta ("msg") para todos: dev1, dev2, ...`
 - Geração das 5 funções de runtime no Python gerado: `ligar`, `desligar`, `verificar`, `alerta` (com e sem variável)
 - Inicialização automática de toda `observation` para zero (conforme Suposições do enunciado)
-- Validação semântica separada em `semantic.py`: dispositivos e observações declarados, nomes válidos, duplicatas, limite de 100 caracteres para `namedevice`/`msg` e associação em `set {namedevice, observation}`
+- Validação semântica separada em `semantic.py`: dispositivos e observações declarados, nomes válidos, duplicatas, limite de 100 caracteres para `namedevice`/`msg`, rejeição de `msg` vazia e associação em `set {namedevice, observation}`
 
 ---
 
 ## O que funciona
 
-Todos os 5 testes compilam e executam corretamente:
+Todos os 6 testes compilam e executam corretamente:
 
 | Exemplo | Cobertura | Saída |
 |---|---|---|
@@ -48,6 +49,7 @@ Todos os 5 testes compilam e executam corretamente:
 | `exemplo3` | `se/entao/senao`, alerta sem parênteses | alerta + `lampada desligado!` |
 | `exemplo4` | `set {dev,obs}`, if aninhado, `verificar()` em cond, broadcast | alerta + ligar umidificador + desligar lampada |
 | `exemplo5` | broadcast com variável para múltiplos dispositivos | (temperatura = 0, condição falsa) |
+| `exemplo6_loop` | `enquanto OBS faca { CMDS }` | liga lâmpada, verifica estado e envia alerta |
 
 A função `alerta` concatena `msg + " " + str(observation)` conforme especificado.
 
@@ -61,7 +63,7 @@ Não há limitações conhecidas dentro do escopo do enunciado. `set x = verific
 
 ## Quais os testes utilizados
 
-5 arquivos em `testes/`, baseados nos exemplos do enunciado (seção 1.2):
+6 arquivos em `testes/`, baseados nos exemplos do enunciado (seção 1.2) e na funcionalidade adicional de laço:
 
 | Arquivo | Descrição |
 |---|---|
@@ -70,6 +72,7 @@ Não há limitações conhecidas dentro do escopo do enunciado. `set x = verific
 | `exemplo3.obsact` | Múltiplos sensores; `se/entao/senao`; alerta sem parênteses |
 | `exemplo4.obsact` | `set {dev,obs}`; if aninhado; `verificar()` em condição; broadcast |
 | `exemplo5.obsact` | Broadcast com variável para múltiplos dispositivos |
+| `exemplo6_loop.obsact` | Laço `enquanto OBS faca { CMDS }` |
 
 Saídas `.py` geradas estão em `testes/`.
 
@@ -118,6 +121,9 @@ cmds         ->  full_cmd cmds | full_cmd
 full_cmd     ->  obsact .
               |  obsact
               |  simple_cmd .
+              |  simple_cmd
+              |  loop .
+              |  loop
 
 simple_cmd   ->  attrib | act
 
@@ -130,13 +136,25 @@ var          ->  NUMBER | TRUE | FALSE
 obsact       ->  se obs entao if_cmds
               |  se obs entao if_cmds senao if_cmds
 
+loop         ->  enquanto obs faca { block_cmds }
+
 if_cmds      ->  simple_cmd . if_cmds
               |  simple_cmd .
               |  simple_cmd
               |  obsact . if_cmds
               |  obsact .
-              |  obsact . if_cmds
+              |  obsact if_cmds
               |  obsact
+
+block_cmds   ->  block_cmd block_cmds
+              |  block_cmd
+
+block_cmd    ->  simple_cmd .
+              |  simple_cmd
+              |  obsact .
+              |  obsact
+              |  loop .
+              |  loop
 
 obs          ->  IDENT oplogic var
               |  IDENT oplogic var && obs
@@ -175,6 +193,7 @@ namelist     ->  IDENT | IDENT , namelist
 | Identifiers com `_` | Lexer e validação semântica aceitam `_` em observation names para cobrir variáveis como `estado_ventilador` dos exemplos |
 | Validação semântica | Em `semantic.py`: verifica declarações, duplicatas, formatos de nomes |
 | 5 funções de runtime | `ligar` retorna 1 e marca o dispositivo como ligado; `desligar` retorna 0 e marca como desligado; `verificar` consulta esse estado |
+| `loop` | Funcionalidade adicional: `enquanto OBS faca { CMDS }`, gerada como `while` em Python |
 
 ---
 

@@ -15,6 +15,8 @@ reserved = {
     'ligar': 'LIGAR',
     'desligar': 'DESLIGAR',
     'verificar': 'VERIFICAR',
+    'enquanto': 'ENQUANTO',
+    'faca': 'FACA',
     'True': 'TRUE',
     'False': 'FALSE',
     'TRUE': 'TRUE',
