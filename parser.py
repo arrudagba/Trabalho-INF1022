@@ -1,6 +1,19 @@
 import ply.yacc as yacc
 from lexer import tokens
 
+syntax_errors = []
+
+
+def reset_syntax_errors():
+    syntax_errors.clear()
+
+
+def _syntax_error(message):
+    text = f"ERRO SINTATICO: {message}"
+    print(text)
+    syntax_errors.append(text)
+
+
 # AST nodes: tuples (tag, ...fields)
 # ('program', devices, cmds)
 # ('device', namedevice, observation|None)
@@ -34,6 +47,11 @@ def p_device_simple(p):
 def p_device_obs(p):
     'device : DISPOSITIVO device_open IDENT COMMA IDENT RBRACE'
     p[0] = ('device', p[3], p[5])
+
+def p_device_error(p):
+    'device : DISPOSITIVO device_open error RBRACE'
+    _syntax_error("DEVICE invalido; esperado dispositivo {namedevice} ou {namedevice, observation}")
+    p[0] = ('error',)
 
 def p_device_open(p):
     '''device_open : COLON LBRACE
@@ -74,6 +92,11 @@ def p_full_cmd_simple_without_dot(p):
     'full_cmd : simple_cmd'
     p[0] = p[1]
 
+def p_full_cmd_error(p):
+    'full_cmd : error DOT'
+    _syntax_error("CMD invalido ou incompleto antes de '.'")
+    p[0] = ('error',)
+
 def p_simple_cmd(p):
     '''simple_cmd : attrib
                   | act'''
@@ -93,6 +116,11 @@ def p_attrib_device_var(p):
     'attrib : SET LBRACE IDENT COMMA IDENT RBRACE ASSIGN var'
     p[0] = ('attrib_device', p[3], p[5], p[8])
 
+def p_attrib_error(p):
+    'attrib : SET error'
+    _syntax_error("ATTRIB invalido; esperado set observation = VAR ou set observation = ACTEXECUTE")
+    p[0] = ('error',)
+
 def p_var_num(p):
     'var : NUMBER'
     p[0] = ('num', p[1])
@@ -104,6 +132,11 @@ def p_var_true(p):
 def p_var_false(p):
     'var : FALSE'
     p[0] = ('bool', False)
+
+def p_var_error(p):
+    'var : error'
+    _syntax_error("VAR invalido; esperado numero inteiro nao negativo ou bool")
+    p[0] = ('error_var', None)
 
 # ── obsact (if / if-else) ─────────────────────────────────────────────────────
 # Single-act if: "se obs entao act." — the DOT is consumed inside if_cmds.
@@ -123,9 +156,19 @@ def p_obsact_ifelse(p):
     'obsact : SE obs ENTAO if_cmds SENAO if_cmds'
     p[0] = ('if', p[2], p[4], p[6])
 
+def p_obsact_error(p):
+    'obsact : SE error'
+    _syntax_error("OBSACT invalido; esperado se OBS entao CMDS")
+    p[0] = ('error',)
+
 def p_loop(p):
     'loop : ENQUANTO obs FACA LBRACE block_cmds RBRACE'
     p[0] = ('while', p[2], p[5])
+
+def p_loop_error(p):
+    'loop : ENQUANTO error'
+    _syntax_error("LOOP invalido; esperado enquanto OBS faca { CMDS }")
+    p[0] = ('error',)
 
 # if_cmds: one or more cmds inside an if body.
 # Each simple_cmd may or may not have a trailing dot (to handle both single-line
@@ -193,6 +236,11 @@ def p_block_cmd_loop(p):
     'block_cmd : loop'
     p[0] = p[1]
 
+def p_block_cmd_error(p):
+    'block_cmd : error DOT'
+    _syntax_error("comando invalido dentro de bloco")
+    p[0] = ('error',)
+
 # ── obs (conditions) ──────────────────────────────────────────────────────────
 
 def p_obs_ident(p):
@@ -219,6 +267,16 @@ def p_obs_verificar_nospace_and(p):
     'obs : VERIFICAR IDENT OPLOGIC var AND obs'
     p[0] = [('cond', ('actexecute', 'verificar', p[2]), p[3], p[4])] + p[6]
 
+def p_obs_error_rhs(p):
+    'obs : IDENT OPLOGIC error'
+    _syntax_error("OBS invalida; esperado VAR depois do operador logico")
+    p[0] = [('cond', p[1], p[2], ('error_var', None))]
+
+def p_obs_verificar_error(p):
+    'obs : VERIFICAR error'
+    _syntax_error("OBS invalida; esperado verificar(namedevice) oplogic VAR")
+    p[0] = [('cond', ('actexecute', 'verificar', '<erro>'), '==', ('error_var', None))]
+
 # ── act ───────────────────────────────────────────────────────────────────────
 
 def p_act_execute(p):
@@ -234,6 +292,11 @@ def p_act_alert_broadcast(p):
     'act : ENVIAR ALERTA alert_args PARA TODOS COLON namelist'
     msg, var = p[3]
     p[0] = ('alert', msg, var, p[7])
+
+def p_act_alert_error(p):
+    'act : ENVIAR ALERTA error'
+    _syntax_error("ACTALERT invalido; esperado enviar alerta (msg) namedevice ou para todos: lista")
+    p[0] = ('error',)
 
 def p_actexecute_ligar(p):
     'actexecute : LIGAR IDENT'
@@ -251,6 +314,13 @@ def p_actexecute_verificar_nospace(p):
     'actexecute : VERIFICAR IDENT'
     p[0] = ('actexecute', 'verificar', p[2])
 
+def p_actexecute_error(p):
+    '''actexecute : LIGAR error
+                  | DESLIGAR error
+                  | VERIFICAR LPAREN error RPAREN'''
+    _syntax_error("ACTEXECUTE invalido; esperado ACTION namedevice")
+    p[0] = ('error',)
+
 def p_alert_args_msg(p):
     '''alert_args : LPAREN STRING RPAREN
                   | STRING'''
@@ -261,6 +331,11 @@ def p_alert_args_var(p):
                   | STRING COMMA IDENT'''
     p[0] = (p[2], p[4]) if len(p) == 6 else (p[1], p[3])
 
+def p_alert_args_error(p):
+    'alert_args : LPAREN error RPAREN'
+    _syntax_error("argumentos de alerta invalidos; esperado (msg) ou (msg, observation)")
+    p[0] = ('', None)
+
 def p_namelist_one(p):
     'namelist : IDENT'
     p[0] = [p[1]]
@@ -269,10 +344,15 @@ def p_namelist_more(p):
     'namelist : IDENT COMMA namelist'
     p[0] = [p[1]] + p[3]
 
+def p_namelist_error(p):
+    'namelist : error'
+    _syntax_error("namelist invalida; esperado pelo menos um namedevice")
+    p[0] = []
+
 def p_error(p):
     if p:
-        print(f"ERRO SINTATICO: token {p.type}({p.value!r}) linha {p.lineno}")
+        _syntax_error(f"token {p.type}({p.value!r}) linha {p.lineno}")
     else:
-        print("ERRO SINTATICO: fim de arquivo inesperado")
+        _syntax_error("fim de arquivo inesperado")
 
 parser = yacc.yacc(debug=False, write_tables=False)

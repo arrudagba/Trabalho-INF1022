@@ -1,5 +1,5 @@
 import sys
-from parser import parser
+from parser import parser, reset_syntax_errors, syntax_errors
 from lexer import lexer
 from codegen import generate
 from semantic import SemanticError, validate
@@ -12,8 +12,9 @@ def main():
         src = f.read()
     lexer.lineno = 1
     lexer.errors = []
+    reset_syntax_errors()
     ast = parser.parse(src, lexer=lexer)
-    if lexer.errors or ast is None:
+    if lexer.errors or syntax_errors or ast is None:
         print("Falha na analise.")
         sys.exit(1)
     try:

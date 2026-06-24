@@ -34,13 +34,13 @@ Funcionalidades implementadas:
 - **Broadcast**: `enviar alerta ("msg") para todos: dev1, dev2, ...`
 - Geração das 5 funções de runtime no Python gerado: `ligar`, `desligar`, `verificar`, `alerta` (com e sem variável)
 - Inicialização automática de toda `observation` para zero (conforme Suposições do enunciado)
-- Validação semântica separada em `semantic.py`: dispositivos e observações declarados, nomes válidos, duplicatas, limite de 100 caracteres para `namedevice`/`msg`, rejeição de `msg` vazia e associação em `set {namedevice, observation}`
+- Validação semântica separada em `semantic.py`: dispositivos e observações declarados, nomes válidos, duplicatas, limite de 100 caracteres para `namedevice`/`msg`, rejeição de `msg` vazia, validação de `num`, `bool`, `oplogic`, `ACTEXECUTE`, listas de destino e associação em `set {namedevice, observation}`
 
 ---
 
 ## O que funciona
 
-Todos os 6 testes compilam e executam corretamente:
+Os exemplos positivos principais compilam e executam corretamente:
 
 | Exemplo | Cobertura | Saída |
 |---|---|---|
@@ -50,20 +50,23 @@ Todos os 6 testes compilam e executam corretamente:
 | `exemplo4` | `set {dev,obs}`, if aninhado, `verificar()` em cond, broadcast | alerta + ligar umidificador + desligar lampada |
 | `exemplo5` | broadcast com variável para múltiplos dispositivos | (temperatura = 0, condição falsa) |
 | `exemplo6_loop` | `enquanto OBS faca { CMDS }` | liga lâmpada, verifica estado e envia alerta |
+| `exemplo7_loop_enquanto` | segundo teste de `enquanto OBS faca { CMDS }` | liga lâmpada, verifica estado e envia alerta |
 
 A função `alerta` concatena `msg + " " + str(observation)` conforme especificado.
 
 ---
 
-## O que não funciona / limitações
+## Observações de implementação
 
-Não há limitações conhecidas dentro do escopo do enunciado. `set x = verificar(dev)` é aceito para cobrir os exemplos do enunciado: a variável `x` é registrada como variável local e pode ser usada em condições posteriores.
+Não há limitações conhecidas dentro do escopo do enunciado.
+
+`set x = verificar(dev)` é aceito para cobrir os exemplos do enunciado: a variável `x` é registrada como variável local e pode ser usada em condições posteriores.
 
 ---
 
 ## Quais os testes utilizados
 
-6 arquivos em `testes/`, baseados nos exemplos do enunciado (seção 1.2) e na funcionalidade adicional de laço:
+15 arquivos `.obsact` em `testes/`, incluindo exemplos positivos, casos extras e testes negativos de erro:
 
 | Arquivo | Descrição |
 |---|---|
@@ -73,6 +76,15 @@ Não há limitações conhecidas dentro do escopo do enunciado. `set x = verific
 | `exemplo4.obsact` | `set {dev,obs}`; if aninhado; `verificar()` em condição; broadcast |
 | `exemplo5.obsact` | Broadcast com variável para múltiplos dispositivos |
 | `exemplo6_loop.obsact` | Laço `enquanto OBS faca { CMDS }` |
+| `exemplo7_loop_enquanto.obsact` | Segundo teste positivo de laço `enquanto` |
+| `exemplo8_if.obsact` | Caso extra com `if` consecutivo |
+| `exemplo9_mensagem_vazia.obsact` | Teste negativo: `msg` vazia deve gerar erro semântico e não gerar `.py` |
+| `exemplo10_colisao_inicializar_dispositivos.obsact` | Caso extra de colisão com função interna do runtime |
+| `exemplo11_entao_ponto.obsact` | Teste negativo: `se OBS entao .` deve gerar erro sintático |
+| `exemplo12_umidade.obsact` | Teste negativo: dispositivo usado como `observation` deve gerar erro semântico |
+| `exemplo13_namedevice_invalido.obsact` | Teste negativo: `namedevice` com número deve gerar erro semântico |
+| `exemplo14_num_negativo.obsact` | Teste negativo: `num` negativo deve gerar erro léxico/sintático e não gerar `.py` |
+| `exemplo15_broadcast_sem_lista.obsact` | Teste negativo: broadcast sem lista de dispositivos deve gerar erro sintático |
 
 Saídas `.py` geradas estão em `testes/`.
 
@@ -191,7 +203,7 @@ namelist     ->  IDENT | IDENT , namelist
 | `alert_args` | Aceita mensagem com ou sem parênteses: exemplos alternam entre `("msg")` e `"msg"` |
 | `device_open` | Aceita `dispositivo: { }` e `dispositivo { }` |
 | Identifiers com `_` | Lexer e validação semântica aceitam `_` em observation names para cobrir variáveis como `estado_ventilador` dos exemplos |
-| Validação semântica | Em `semantic.py`: verifica declarações, duplicatas, formatos de nomes |
+| Validação semântica | Em `semantic.py`: verifica declarações, duplicatas, formatos de nomes, `msg` vazia, `num`, `bool`, `oplogic`, `ACTEXECUTE`, lista de destinos e comandos desconhecidos |
 | 5 funções de runtime | `ligar` retorna 1 e marca o dispositivo como ligado; `desligar` retorna 0 e marca como desligado; `verificar` consulta esse estado |
 | `loop` | Funcionalidade adicional: `enquanto OBS faca { CMDS }`, gerada como `while` em Python |
 
@@ -208,6 +220,6 @@ Trabalho 2026.1/
 ├── codegen.py     # gerador de código Python
 ├── README.md      # este relatório
 └── testes/
-    ├── exemplo1.obsact  ...  exemplo5.obsact
-    └── exemplo1.py      ...  exemplo5.py
+    ├── exemplo1.obsact  ...  exemplo15_*.obsact
+    └── exemplo1.py      ...  exemplos positivos e extras gerados
 ```

@@ -6,6 +6,8 @@ OBSERVATION_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_]*$')
 MAX_DEVICE_NAME_LEN = 100
 MAX_MSG_LEN = 100
 RUNTIME_NAMES = {'ligar', 'desligar', 'verificar', 'alerta', 'main'}
+VALID_ACTIONS = {'ligar', 'desligar', 'verificar'}
+VALID_OPLOGIC = {'>', '<', '>=', '<=', '==', '!='}
 
 
 class SemanticError(Exception):
@@ -18,12 +20,26 @@ class SemanticError(Exception):
 
 
 def validate(ast):
-    _, devices, cmds = ast
     errors = []
+
+    if not isinstance(ast, tuple) or len(ast) != 3 or ast[0] != 'program':
+        raise SemanticError(["programa invalido"])
+
+    _, devices, cmds = ast
     device_names = {}
     observations = {}
 
-    for _, name, observation in devices:
+    if not devices:
+        errors.append("programa deve declarar pelo menos um dispositivo")
+    if not cmds:
+        errors.append("programa deve conter pelo menos um comando")
+
+    for device in devices:
+        if not isinstance(device, tuple) or len(device) != 3 or device[0] != 'device':
+            errors.append("declaracao de dispositivo invalida")
+            continue
+
+        _, name, observation = device
         device_errors = _device_name_errors(name, 'declaracao')
         if device_errors:
             errors.extend(device_errors)
@@ -56,6 +72,10 @@ def validate(ast):
 
 
 def _validate_cmd(cmd, devices, observations, errors):
+    if not isinstance(cmd, tuple) or not cmd:
+        errors.append("comando invalido")
+        return
+
     tag = cmd[0]
 
     if tag == 'attrib':
@@ -71,12 +91,14 @@ def _validate_cmd(cmd, devices, observations, errors):
                 observations.setdefault(obs_name, [])
         else:
             _require_observation(obs_name, observations, 'atribuicao', errors)
+            _validate_var(value, 'atribuicao', errors)
         return
 
     if tag == 'attrib_device':
         _, dev_name, obs_name, _value = cmd
         _require_device(dev_name, devices, 'atribuicao', errors)
         _require_observation(obs_name, observations, 'atribuicao', errors)
+        _validate_var(_value, 'atribuicao', errors)
         if dev_name in devices and obs_name in observations and devices[dev_name] != obs_name:
             errors.append(
                 f"observation '{obs_name}' nao pertence ao dispositivo '{dev_name}'"
@@ -108,19 +130,33 @@ def _validate_cmd(cmd, devices, observations, errors):
 
     if tag == 'alert':
         _, msg, obs_var, target_devices = cmd
+        if not isinstance(msg, str):
+            errors.append("msg deve ser uma string")
+            return
         if not msg.strip():
             errors.append("msg nao pode ser vazia")
         if len(msg) > MAX_MSG_LEN:
             errors.append(f"msg excede {MAX_MSG_LEN} caracteres: {msg[:30]!r}...")
         if obs_var is not None:
             _require_observation(obs_var, observations, 'alerta', errors)
+        if not target_devices:
+            errors.append("alerta deve ter pelo menos um dispositivo de destino")
         for d in target_devices:
             _require_device(d, devices, 'alerta', errors)
         return
 
+    errors.append(f"comando desconhecido: {tag}")
+
 
 def _validate_cond(cond, devices, observations, errors):
-    _, lhs, _op, _rhs = cond
+    if not isinstance(cond, tuple) or len(cond) != 4 or cond[0] != 'cond':
+        errors.append("OBS invalida")
+        return
+
+    _, lhs, op, rhs = cond
+    if op not in VALID_OPLOGIC:
+        errors.append(f"oplogic invalido em condicao: {op!r}")
+    _validate_var(rhs, 'condicao', errors)
     if isinstance(lhs, tuple) and lhs[0] == 'actexecute':
         _validate_actexecute(lhs, devices, 'condicao', errors)
     else:
@@ -128,8 +164,33 @@ def _validate_cond(cond, devices, observations, errors):
 
 
 def _validate_actexecute(node, devices, context, errors):
-    _, _action, device = node
+    if not isinstance(node, tuple) or len(node) != 3 or node[0] != 'actexecute':
+        errors.append(f"ACTEXECUTE invalido em {context}")
+        return
+
+    _, action, device = node
+    if action not in VALID_ACTIONS:
+        errors.append(f"acao invalida em {context}: {action!r}")
     _require_device(device, devices, context, errors)
+
+
+def _validate_var(value, context, errors):
+    if not isinstance(value, tuple) or len(value) != 2:
+        errors.append(f"VAR invalido em {context}; esperado num ou bool")
+        return
+
+    tag, val = value
+    if tag == 'num':
+        if not isinstance(val, int) or val < 0:
+            errors.append(f"num invalido em {context}; use inteiro nao negativo")
+        return
+
+    if tag == 'bool':
+        if not isinstance(val, bool):
+            errors.append(f"bool invalido em {context}; use True ou False")
+        return
+
+    errors.append(f"VAR invalido em {context}; esperado num ou bool")
 
 
 def _require_device(name, devices, context, errors):
