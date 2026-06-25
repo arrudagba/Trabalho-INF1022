@@ -5,7 +5,7 @@ DEVICE_RE = re.compile(r'^[A-Za-z]+$')
 OBSERVATION_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_]*$')
 MAX_DEVICE_NAME_LEN = 100
 MAX_MSG_LEN = 100
-RUNTIME_NAMES = {'ligar', 'desligar', 'verificar', 'alerta', 'main'}
+RUNTIME_NAMES = {'ligar', 'desligar', 'verificar', 'alerta', 'main', 'inicializar_dispositivos'}
 VALID_ACTIONS = {'ligar', 'desligar', 'verificar'}
 VALID_OPLOGIC = {'>', '<', '>=', '<=', '==', '!='}
 

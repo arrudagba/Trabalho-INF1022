@@ -37,8 +37,8 @@ def main():
     movimento = True
     if umidade < 40:
         alerta('Monitor', 'Ar seco')
-        if movimento == True:
-            ligar('lampada')
+    if movimento == True:
+        ligar('lampada')
 
 if __name__ == "__main__":
     main()

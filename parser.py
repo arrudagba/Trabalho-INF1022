@@ -19,8 +19,8 @@ def _syntax_error(message):
 # ('device', namedevice, observation|None)
 # ('attrib', obs_name, value)         -- value: ('num',n)|('bool',b)|('actexecute',act,dev)
 # ('attrib_device', dev, obs, value)  -- set {dev, obs} = val
-# ('if', cond_list, then_cmds, else_cmds|None)
-# ('while', cond_list, body_cmds)
+# ('if', cond_list, then_cmds, else_cmds|None)   -- then/else are command LISTS
+# ('while', cond_list, body_cmds)                -- body is a command LIST
 # ('actexecute', 'ligar'|'desligar'|'verificar', device)
 # ('alert', msg, obs|None, devices_list)
 # cond item: ('cond', lhs, op, rhs)
@@ -59,41 +59,39 @@ def p_device_open(p):
     p[0] = None
 
 # ── top-level cmds ───────────────────────────────────────────────────────────
+# A program body is a sequence of commands. Every command is self-delimited:
+#   * simple_cmd  -- optionally terminated by '.'  (per enunciado examples)
+#   * if_stmt     -- delimited by its own structure (single cmd or { block })
+#   * loop        -- delimited by 'faca { ... }'
+# There is no ambiguity about where an if ends, so two consecutive top-level
+# ifs no longer get wrongly nested.
 
 def p_cmds_more(p):
-    'cmds : full_cmd cmds'
+    'cmds : cmd cmds'
     p[0] = [p[1]] + p[2]
 
 def p_cmds_one(p):
-    'cmds : full_cmd'
+    'cmds : cmd'
     p[0] = [p[1]]
 
-def p_full_cmd_obsact_dot(p):
-    'full_cmd : obsact DOT'
+def p_cmd_simple_dot(p):
+    'cmd : simple_cmd DOT'
     p[0] = p[1]
 
-def p_full_cmd_obsact(p):
-    'full_cmd : obsact'
+def p_cmd_simple(p):
+    'cmd : simple_cmd'
     p[0] = p[1]
 
-def p_full_cmd_loop_dot(p):
-    'full_cmd : loop DOT'
+def p_cmd_if(p):
+    'cmd : if_stmt'
     p[0] = p[1]
 
-def p_full_cmd_loop(p):
-    'full_cmd : loop'
+def p_cmd_loop(p):
+    'cmd : loop'
     p[0] = p[1]
 
-def p_full_cmd_simple(p):
-    'full_cmd : simple_cmd DOT'
-    p[0] = p[1]
-
-def p_full_cmd_simple_without_dot(p):
-    'full_cmd : simple_cmd'
-    p[0] = p[1]
-
-def p_full_cmd_error(p):
-    'full_cmd : error DOT'
+def p_cmd_error(p):
+    'cmd : error DOT'
     _syntax_error("CMD invalido ou incompleto antes de '.'")
     p[0] = ('error',)
 
@@ -133,112 +131,52 @@ def p_var_false(p):
     'var : FALSE'
     p[0] = ('bool', False)
 
-def p_var_error(p):
-    'var : error'
-    _syntax_error("VAR invalido; esperado numero inteiro nao negativo ou bool")
-    p[0] = ('error_var', None)
+# ── if / if-else ──────────────────────────────────────────────────────────────
+# Body of an if/else (branch) is EITHER a single command, OR a braced block
+# { cmds } for multiple commands and nested ifs. A branch always yields a LIST.
 
-# ── obsact (if / if-else) ─────────────────────────────────────────────────────
-# Single-act if: "se obs entao act." — the DOT is consumed inside if_cmds.
-#   obsact reduces without consuming extra DOT; full_cmd uses 'obsact' (no dot).
-# Multi-cmd if:  "se obs entao cmd. cmd. ." — body cmds consume their dots,
-#   inner obsacts consume their own dots (via if_cmds: obsact DOT).
-#   The lone "." is the obsact block terminator consumed by "obsact DOT" rules.
-# Note: a single-act inner if (no lone dot) followed by more outer cmds MUST
-#   have an explicit lone "." after it so the parser knows the inner if ended.
-#   Example: "se c entao se c2 entao ligar v. . set x=1. ."
-
-def p_obsact_if(p):
-    'obsact : SE obs ENTAO if_cmds'
+def p_if_stmt(p):
+    'if_stmt : SE obs ENTAO branch'
     p[0] = ('if', p[2], p[4], None)
 
-def p_obsact_ifelse(p):
-    'obsact : SE obs ENTAO if_cmds SENAO if_cmds'
+def p_if_stmt_else(p):
+    'if_stmt : SE obs ENTAO branch SENAO branch'
     p[0] = ('if', p[2], p[4], p[6])
 
-def p_obsact_error(p):
-    'obsact : SE error'
-    _syntax_error("OBSACT invalido; esperado se OBS entao CMDS")
+def p_if_stmt_error(p):
+    'if_stmt : SE error'
+    _syntax_error("OBSACT invalido; esperado se OBS entao CMD ou se OBS entao { CMDS }")
     p[0] = ('error',)
 
+def p_branch_block(p):
+    'branch : LBRACE cmds RBRACE'
+    p[0] = p[2]
+
+def p_branch_simple_dot(p):
+    'branch : simple_cmd DOT'
+    p[0] = [p[1]]
+
+def p_branch_simple(p):
+    'branch : simple_cmd'
+    p[0] = [p[1]]
+
+def p_branch_if(p):
+    'branch : if_stmt'
+    p[0] = [p[1]]
+
+def p_branch_loop(p):
+    'branch : loop'
+    p[0] = [p[1]]
+
+# ── loop ──────────────────────────────────────────────────────────────────────
+
 def p_loop(p):
-    'loop : ENQUANTO obs FACA LBRACE block_cmds RBRACE'
+    'loop : ENQUANTO obs FACA LBRACE cmds RBRACE'
     p[0] = ('while', p[2], p[5])
 
 def p_loop_error(p):
     'loop : ENQUANTO error'
     _syntax_error("LOOP invalido; esperado enquanto OBS faca { CMDS }")
-    p[0] = ('error',)
-
-# if_cmds: one or more cmds inside an if body.
-# Each simple_cmd may or may not have a trailing dot (to handle both single-line
-# and multi-line bodies). PLY resolves shift/reduce by preferring shift (greedy).
-
-def p_if_cmds_simple_dot_more(p):
-    'if_cmds : simple_cmd DOT if_cmds'
-    p[0] = [p[1]] + p[3]
-
-def p_if_cmds_simple_dot(p):
-    'if_cmds : simple_cmd DOT'
-    p[0] = [p[1]]
-
-def p_if_cmds_simple(p):
-    'if_cmds : simple_cmd'
-    p[0] = [p[1]]
-
-def p_if_cmds_obsact_dot_more(p):
-    'if_cmds : obsact DOT if_cmds'
-    p[0] = [p[1]] + p[3]
-
-def p_if_cmds_obsact_dot(p):
-    'if_cmds : obsact DOT'
-    p[0] = [p[1]]
-
-def p_if_cmds_obsact_more(p):
-    'if_cmds : obsact if_cmds'
-    p[0] = [p[1]] + p[2]
-
-def p_if_cmds_obsact(p):
-    'if_cmds : obsact'
-    p[0] = [p[1]]
-
-# block_cmds is used by explicit braced blocks, currently loops.
-
-def p_block_cmds_more(p):
-    'block_cmds : block_cmd block_cmds'
-    p[0] = [p[1]] + p[2]
-
-def p_block_cmds_one(p):
-    'block_cmds : block_cmd'
-    p[0] = [p[1]]
-
-def p_block_cmd_simple_dot(p):
-    'block_cmd : simple_cmd DOT'
-    p[0] = p[1]
-
-def p_block_cmd_simple(p):
-    'block_cmd : simple_cmd'
-    p[0] = p[1]
-
-def p_block_cmd_obsact_dot(p):
-    'block_cmd : obsact DOT'
-    p[0] = p[1]
-
-def p_block_cmd_obsact(p):
-    'block_cmd : obsact'
-    p[0] = p[1]
-
-def p_block_cmd_loop_dot(p):
-    'block_cmd : loop DOT'
-    p[0] = p[1]
-
-def p_block_cmd_loop(p):
-    'block_cmd : loop'
-    p[0] = p[1]
-
-def p_block_cmd_error(p):
-    'block_cmd : error DOT'
-    _syntax_error("comando invalido dentro de bloco")
     p[0] = ('error',)
 
 # ── obs (conditions) ──────────────────────────────────────────────────────────
@@ -266,16 +204,6 @@ def p_obs_verificar_nospace(p):
 def p_obs_verificar_nospace_and(p):
     'obs : VERIFICAR IDENT OPLOGIC var AND obs'
     p[0] = [('cond', ('actexecute', 'verificar', p[2]), p[3], p[4])] + p[6]
-
-def p_obs_error_rhs(p):
-    'obs : IDENT OPLOGIC error'
-    _syntax_error("OBS invalida; esperado VAR depois do operador logico")
-    p[0] = [('cond', p[1], p[2], ('error_var', None))]
-
-def p_obs_verificar_error(p):
-    'obs : VERIFICAR error'
-    _syntax_error("OBS invalida; esperado verificar(namedevice) oplogic VAR")
-    p[0] = [('cond', ('actexecute', 'verificar', '<erro>'), '==', ('error_var', None))]
 
 # ── act ───────────────────────────────────────────────────────────────────────
 
@@ -313,13 +241,6 @@ def p_actexecute_verificar_parens(p):
 def p_actexecute_verificar_nospace(p):
     'actexecute : VERIFICAR IDENT'
     p[0] = ('actexecute', 'verificar', p[2])
-
-def p_actexecute_error(p):
-    '''actexecute : LIGAR error
-                  | DESLIGAR error
-                  | VERIFICAR LPAREN error RPAREN'''
-    _syntax_error("ACTEXECUTE invalido; esperado ACTION namedevice")
-    p[0] = ('error',)
 
 def p_alert_args_msg(p):
     '''alert_args : LPAREN STRING RPAREN

@@ -4,11 +4,11 @@ dispositivo: {lampada, potenciaLampada}
 dispositivo: {umidificador, potenciaUmidificador}
 dispositivo: {Monitor}
 set {lampada, potenciaLampada} = 100.
-se umidade < 40 entao
+se umidade < 40 entao {
     enviar alerta "Ar seco detectado" Monitor.
-    se verificar(umidificador) == 0 entao
+    se verificar(umidificador) == 0 entao {
         ligar umidificador.
         set potenciaUmidificador = 100.
-    .
-.
+    }
+}
 se movimento == True entao ligar lampada senao desligar lampada.

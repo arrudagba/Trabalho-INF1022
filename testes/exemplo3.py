@@ -37,10 +37,10 @@ def main():
     potencia = 100
     if umidade < 40:
         alerta('Monitor', 'Ar seco detectado')
-        if movimento == True:
-            ligar('lampada')
-        else:
-            desligar('lampada')
+    if movimento == True:
+        ligar('lampada')
+    else:
+        desligar('lampada')
 
 if __name__ == "__main__":
     main()

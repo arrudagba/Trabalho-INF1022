@@ -31,9 +31,9 @@ def alerta(namedevice, msg, var=None):
 
 def main():
     inicializar_dispositivos('Sensor')
-    inicializar_dispositivos = 0
-    inicializar_dispositivos = 1
-    alerta('Sensor', 'Valor', inicializar_dispositivos)
+    obs_inicializar_dispositivos = 0
+    obs_inicializar_dispositivos = 1
+    alerta('Sensor', 'Valor', obs_inicializar_dispositivos)
 
 if __name__ == "__main__":
     main()
